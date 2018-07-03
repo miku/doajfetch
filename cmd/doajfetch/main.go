@@ -1,7 +1,7 @@
-// Fetch documents from DOAJ.
+// Fetch documents from DOAJ. Data resides in an elasticsearch server, which is partially exposed.
 //
-// https://doaj.org/search?source=%7B%22query%22%3A%7B%22match_all%22%3A%7B%7D%7D%2C%22from%22%3A0%2C%22size%22%3A10%7D
-// $ curl -v "https://doaj.org/query/journal,article" | jq .
+//     $ curl -v https://doaj.org/query/journal,article | jq .
+//
 package main
 
 import (
@@ -24,8 +24,9 @@ import (
 const Version = "0.1.0"
 
 var (
-	server       = flag.String("server", "https://doaj.org/query", "DOAJ URL including prefix")
-	ua           = flag.String("ua", "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko", "user agent to use")
+	server = flag.String("server", "https://doaj.org/query", "DOAJ URL including prefix")
+	ua     = flag.String("ua", "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0)",
+		"user agent to use")
 	batchSize    = flag.Int64("size", 1000, "number of results per request")
 	verbose      = flag.Bool("verbose", false, "be verbose")
 	showProgress = flag.Bool("P", false, "show progress")
@@ -80,7 +81,8 @@ func main() {
 	defer bw.Flush()
 
 	for {
-		query := fmt.Sprintf(`{"query": {"constant_score": {"query": {"match_all": {}}}}, "from": %d, "size": %d}`, from, *batchSize)
+		query := fmt.Sprintf(`{"query": {"constant_score": {"query": {"match_all": {}}}}, "from": %d, "size": %d}`,
+			from, *batchSize)
 
 		params := url.Values{}
 		params.Add("source", query)
