@@ -33,6 +33,6 @@ rpm: $(TARGETS)
 	mkdir -p $(HOME)/rpmbuild/{BUILD,SOURCES,SPECS,RPMS}
 	cp ./packaging/rpm/$(PKGNAME).spec $(HOME)/rpmbuild/SPECS
 	cp $(TARGETS) $(HOME)/rpmbuild/BUILD
-	cp docs/$(PKGNAME).1.gz $(HOME)/rpmbuild/BUILD
+	# cp docs/$(PKGNAME).1.gz $(HOME)/rpmbuild/BUILD
 	./packaging/rpm/buildrpm.sh $(PKGNAME)
 	cp $(HOME)/rpmbuild/RPMS/x86_64/$(PKGNAME)*.rpm .
