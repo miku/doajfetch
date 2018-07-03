@@ -11,7 +11,7 @@ Usage of doajfetch:
   -sleep duration
         sleep between requests (default 2s)
   -ua string
-        user agent to use (default "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko")
+        user agent to use (default "Mozilla/5.0 (Windows NT ...")
   -verbose
         be verbose
   -version
