@@ -12,3 +12,6 @@
 *.out
 
 /doajfetch
+/packaging/deb/doajfetch/*
+/*deb
+/*rpm
