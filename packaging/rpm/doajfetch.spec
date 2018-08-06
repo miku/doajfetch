@@ -1,6 +1,6 @@
 Summary:    Fetch DOAJ API data.
 Name:       doajfetch
-Version:    0.1.0
+Version:    0.2.0
 Release:    0
 License:    GPL
 BuildArch:  x86_64

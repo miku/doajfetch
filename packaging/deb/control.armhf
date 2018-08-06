@@ -1,8 +1,8 @@
 Package: doajfetch
-Version: 0.1.0
+Version: 0.2.0
 Section: utils
 Priority: optional
 Architecture: armhf
 Depends: libc6 (>= 2.12)
 Maintainer: Martin Czygan <martin.czygan@uni-leipzig.de>
-Description: Fetch DOAJ documents. 
+Description: Fetch DOAJ documents.
