@@ -117,6 +117,7 @@ func main() {
 
 		var response Response
 		if err := json.NewDecoder(&buf).Decode(&response); err != nil {
+			log.Printf(buf.String())
 			log.Fatal(err)
 		}
 		if from > response.Hits.Total {
