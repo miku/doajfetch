@@ -88,6 +88,18 @@ func main() {
 		}
 		defer resp.Body.Close()
 
+		if resp.StatusCode >= 400 {
+			if resp.StatusCode == 429 {
+				if *sleep < 5 {
+					*sleep = *sleep * 2
+					log.Printf("due to HTTP 429, increasing sleep between requests")
+					time.Sleep(*sleep)
+					continue
+				}
+			}
+			log.Fatalf("failed with HTTP: %s", resp.StatusCode)
+		}
+
 		var buf bytes.Buffer
 		tee := io.TeeReader(resp.Body, &buf)
 
