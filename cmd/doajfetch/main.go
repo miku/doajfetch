@@ -1,6 +1,8 @@
-// Fetch documents from DOAJ. Data resides in an elasticsearch server, which is partially exposed.
+// Fetch documents from DOAJ. Data resides in an elasticsearch server, API v1:
 //
-//     $ curl -v https://doaj.org/query/journal,article | jq .
+//     $ curl -X GET --header "Accept: application/json" "https://doaj.org/api/v1/search/articles/*"
+//
+// * https://doaj.org/api/v1/docs#!/Search/get_api_v1_search_articles_search_query
 //
 package main
 
@@ -12,7 +14,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -21,39 +22,34 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 var (
-	server = flag.String("server", "https://doaj.org/query", "DOAJ URL including prefix")
-	ua     = flag.String("ua", "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0)",
-		"user agent to use")
-	batchSize    = flag.Int64("size", 1000, "number of results per request")
+	apiurl       = flag.String("url", "https://doaj.org/api/v1/search/articles", "DOAJ API endpoint URL")
+	batchSize    = flag.Int64("size", 100, "number of results per request (page)")
+	userAgent    = flag.String("ua", "Mozilla/5.0 (Android 4.4; Mobile; rv:41.0) Gecko/41.0 Firefox/41.0", "user agent string")
 	verbose      = flag.Bool("verbose", false, "be verbose")
 	showProgress = flag.Bool("P", false, "show progress")
 	sleep        = flag.Duration("sleep", 2*time.Second, "sleep between requests")
 	showVersion  = flag.Bool("version", false, "show version")
 )
 
-type Response struct {
-	Hits struct {
-		Hits []struct {
-			Id     string      `json:"_id"`
-			Index  string      `json:"_index"`
-			Score  interface{} `json:"_score"`
-			Sort   []string    `json:"sort"`
-			Source interface{} `json:"_source"`
-			Type   string      `json:"_type"`
-		} `json:"hits"`
-		MaxScore interface{} `json:"max_score"`
-		Total    int64       `json:"total"`
-	} `json:"hits"`
-	Shards struct {
-		Failed     int64 `json:"failed"`
-		Successful int64 `json:"successful"`
-		Total      int64 `json:"total"`
-	} `json:"_shards"`
-	TimedOut bool  `json:"timed_out"`
-	Took     int64 `json:"took"`
+// ArticlesV1 is returned from https://doaj.org/api/v1/search/articles/*. The
+// next page URL can be found in next. On the last page next will be empty.
+type ArticlesV1 struct {
+	Last     string `json:"last"`
+	Next     string `json:"next"`
+	Page     int64  `json:"page"`
+	PageSize int64  `json:"pageSize"`
+	Query    string `json:"query"`
+	Results  []struct {
+		Bibjson     interface{} `json:"bibjson"`
+		CreatedDate string      `json:"created_date"`
+		Id          string      `json:"id"`
+		LastUpdated string      `json:"last_updated"`
+	} `json:"results"`
+	Timestamp string `json:"timestamp"`
+	Total     int64  `json:"total"`
 }
 
 func main() {
@@ -64,41 +60,28 @@ func main() {
 		os.Exit(0)
 	}
 
-	indices := []string{"journal", "article"}
-
 	client := pester.New()
 	client.Concurrency = 3
 	client.MaxRetries = 5
 	client.Backoff = pester.ExponentialBackoff
 	client.KeepLog = false
 
-	base := fmt.Sprintf("%s/%s", strings.TrimRight(*server, "/"),
-		strings.Join(indices, ","))
-
-	var from int64
+	link := fmt.Sprintf("%s/*?pageSize=%d", strings.TrimRight(*apiurl, "/"), *batchSize)
 
 	bw := bufio.NewWriter(os.Stdout)
 	defer bw.Flush()
 
+	var counter int64
+
 	for {
-		query := fmt.Sprintf(`{"query": {"constant_score": {"query": {"match_all": {}}}}, "from": %d, "size": %d}`,
-			from, *batchSize)
-
-		params := url.Values{}
-		params.Add("source", query)
-
-		link := fmt.Sprintf("%s/_search?%s", base, params.Encode())
-
 		req, err := http.NewRequest("GET", link, nil)
 		if err != nil {
 			log.Fatal(err)
 		}
-		req.Header.Add("User-Agent", *ua)
-
+		req.Header.Add("User-Agent", "Mozilla/5.0 (Android 4.4; Mobile; rv:41.0) Gecko/41.0 Firefox/41.0")
 		if *verbose {
 			log.Println(req.URL.String())
 		}
-
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Fatal(err)
@@ -115,20 +98,20 @@ func main() {
 			log.Fatal(err)
 		}
 
-		var response Response
-		if err := json.NewDecoder(&buf).Decode(&response); err != nil {
-			log.Printf(buf.String())
+		var payload ArticlesV1
+		if err := json.NewDecoder(&buf).Decode(&payload); err != nil {
+			log.Println(buf.String())
 			log.Fatal(err)
 		}
-		if from > response.Hits.Total {
+		if payload.Next == "" {
 			break
 		}
-		from = from + *batchSize
+		link = payload.Next
 
 		if *showProgress {
-			log.Printf("%d/%d (%0.2f%%)", from, response.Hits.Total,
-				float64(from)/float64(response.Hits.Total)*100)
+			log.Printf("%d/%d", *batchSize*counter, payload.Total)
 		}
+		counter++
 		time.Sleep(*sleep)
 	}
 }
