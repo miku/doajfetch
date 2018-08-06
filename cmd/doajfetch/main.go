@@ -90,14 +90,14 @@ func main() {
 
 		if resp.StatusCode >= 400 {
 			if resp.StatusCode == 429 {
-				if *sleep < 5 {
+				if *sleep < 5*time.Second {
 					*sleep = *sleep * 2
 					log.Printf("due to HTTP 429, increasing sleep between requests")
 					time.Sleep(*sleep)
 					continue
 				}
 			}
-			log.Fatalf("failed with HTTP: %s", resp.StatusCode)
+			log.Fatalf("failed with HTTP: %d", resp.StatusCode)
 		}
 
 		var buf bytes.Buffer
