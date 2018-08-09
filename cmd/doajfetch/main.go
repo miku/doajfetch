@@ -62,7 +62,7 @@ func main() {
 
 	client := pester.New()
 	client.Concurrency = 3
-	client.MaxRetries = 5
+	client.MaxRetries = 8
 	client.Backoff = pester.ExponentialBackoff
 	client.KeepLog = false
 
@@ -90,7 +90,7 @@ func main() {
 
 		if resp.StatusCode >= 400 {
 			if resp.StatusCode == 429 {
-				if *sleep < 5*time.Second {
+				if *sleep < 8*time.Second {
 					*sleep = *sleep * 2
 					log.Printf("due to HTTP 429, increasing sleep between requests")
 					time.Sleep(*sleep)
