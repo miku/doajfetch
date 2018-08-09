@@ -27,7 +27,7 @@ const Version = "0.2.0"
 var (
 	apiurl       = flag.String("url", "https://doaj.org/api/v1/search/articles", "DOAJ API endpoint URL")
 	batchSize    = flag.Int64("size", 100, "number of results per request (page)")
-	userAgent    = flag.String("ua", "Mozilla/5.0 (Android 4.4; Mobile; rv:41.0) Gecko/41.0 Firefox/41.0", "user agent string")
+	userAgent    = flag.String("ua", fmt.Sprintf("doajfetch/%s", Version), "user agent string")
 	verbose      = flag.Bool("verbose", false, "be verbose")
 	showProgress = flag.Bool("P", false, "show progress")
 	sleep        = flag.Duration("sleep", 2*time.Second, "sleep between requests")
