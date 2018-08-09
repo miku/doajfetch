@@ -78,7 +78,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		req.Header.Add("User-Agent", "Mozilla/5.0 (Android 4.4; Mobile; rv:41.0) Gecko/41.0 Firefox/41.0")
+		req.Header.Add("User-Agent", *userAgent)
 		if *verbose {
 			log.Println(req.URL.String())
 		}
