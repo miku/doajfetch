@@ -7,14 +7,14 @@ Fetch all DOAJ records, via API.
 ```
 Usage of doajfetch:
   -P    show progress
-  -server string
-        DOAJ URL including prefix (default "https://doaj.org/query")
   -size int
-        number of results per request (default 1000)
+        number of results per request (page) (default 100)
   -sleep duration
         sleep between requests (default 2s)
   -ua string
-        user agent to use (default "Mozilla/5.0 (Windows NT ...")
+        user agent string (default "Mozilla/5.0 (Android 4.4; Mobile; rv:41.0) Gecko/41.0 Firefox/41.0")
+  -url string
+        DOAJ API endpoint URL (default "https://doaj.org/api/v1/search/articles")
   -verbose
         be verbose
   -version
