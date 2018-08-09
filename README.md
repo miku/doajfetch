@@ -12,7 +12,7 @@ Usage of doajfetch:
   -sleep duration
         sleep between requests (default 2s)
   -ua string
-        user agent string (default "Mozilla/5.0 (Android 4.4; Mobile; rv:41.0) Gecko/41.0 Firefox/41.0")
+        user agent string (default "doajfetch/0.2.0")
   -url string
         DOAJ API endpoint URL (default "https://doaj.org/api/v1/search/articles")
   -verbose
