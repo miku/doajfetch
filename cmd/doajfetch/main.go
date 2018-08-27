@@ -133,7 +133,9 @@ func main() {
 		if *showProgress {
 			log.Printf("%d/%d", *batchSize*counter, payload.Total)
 		}
+
 		counter++
+		retryCountStatusCode = 0
 		time.Sleep(*sleep)
 	}
 }
