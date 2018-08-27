@@ -22,16 +22,19 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const Version = "0.2.0"
+const Version = "0.3.0"
 
 var (
-	apiurl       = flag.String("url", "https://doaj.org/api/v1/search/articles", "DOAJ API endpoint URL")
-	batchSize    = flag.Int64("size", 100, "number of results per request (page)")
-	userAgent    = flag.String("ua", fmt.Sprintf("doajfetch/%s", Version), "user agent string")
-	verbose      = flag.Bool("verbose", false, "be verbose")
-	showProgress = flag.Bool("P", false, "show progress")
-	sleep        = flag.Duration("sleep", 2*time.Second, "sleep between requests")
-	showVersion  = flag.Bool("version", false, "show version")
+	apiurl                  = flag.String("url", "https://doaj.org/api/v1/search/articles", "DOAJ API endpoint URL")
+	batchSize               = flag.Int64("size", 100, "number of results per request (page)")
+	userAgent               = flag.String("ua", fmt.Sprintf("doajfetch/%s", Version), "user agent string")
+	verbose                 = flag.Bool("verbose", false, "be verbose")
+	showProgress            = flag.Bool("P", false, "show progress")
+	sleep                   = flag.Duration("sleep", 2*time.Second, "sleep between requests")
+	showVersion             = flag.Bool("version", false, "show version")
+	maxRetries              = flag.Int("max-retries", 10, "retry failed requests")
+	maxRetriesStatusCode    = flag.Int("max-retries-status-code", 10, "retry requests with HTTP >= 400")
+	maxSleepBetweenRequests = flag.Duration("max-sleep", 10*time.Second, "maximum number of seconds to sleep between requests")
 )
 
 // ArticlesV1 is returned from https://doaj.org/api/v1/search/articles/*. The
@@ -62,7 +65,7 @@ func main() {
 
 	client := pester.New()
 	client.Concurrency = 3
-	client.MaxRetries = 8
+	client.MaxRetries = 12
 	client.Backoff = pester.ExponentialBackoff
 	client.KeepLog = false
 
@@ -72,6 +75,7 @@ func main() {
 	defer bw.Flush()
 
 	var counter int64
+	var retryCountStatusCode int // number of retries based on HTTP status code
 
 	for {
 		req, err := http.NewRequest("GET", link, nil)
@@ -90,14 +94,20 @@ func main() {
 
 		if resp.StatusCode >= 400 {
 			if resp.StatusCode == 429 {
-				if *sleep < 8*time.Second {
+				if *sleep < *maxSleepBetweenRequests {
 					*sleep = *sleep * 2
-					log.Printf("due to HTTP 429, increasing sleep between requests")
+					log.Printf("due to HTTP 429, increasing sleep between requests to %v", *sleep)
 					time.Sleep(*sleep)
 					continue
 				}
 			}
-			log.Fatalf("failed with HTTP: %d", resp.StatusCode)
+			if retryCountStatusCode == *maxRetriesStatusCode {
+				log.Fatalf("failed with HTTP %d", resp.StatusCode)
+			}
+			time.Sleep(time.Duration(retryCountStatusCode) * time.Second)
+			log.Println("failed with HTTP %d, retry #%d", resp.StatusCode, retryCountStatusCode)
+			retryCountStatusCode++
+			continue
 		}
 
 		var buf bytes.Buffer
