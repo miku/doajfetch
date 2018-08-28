@@ -6,6 +6,8 @@ Fetch all DOAJ records, via API.
 
 Install via `go get` or [releases](https://github.com/miku/doajfetch/releases).
 
+Note: As of August 2018, DOAJ is working on providing data dumps as well.
+
 ```
 Usage of doajfetch:
   -P    show progress
