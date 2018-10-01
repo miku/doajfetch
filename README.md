@@ -2,6 +2,16 @@
 
 Fetch all DOAJ records, via API.
 
+DOAJ dumps will probably be made available in Fall 2018.
+
+> In addition, this persistent grab of our data constituted a feature request –
+> it should be easier to download our entire DOAJ dataset and we will be
+> implementing that over the coming weeks.
+
+* https://blog.doaj.org/2018/10/01/infrastructure-and-why-sustainable-funding-so-important-to-services-like-doaj/
+
+API docs:
+
 * https://doaj.org/api/v1/docs#!/Search/get_api_v1_search_articles_search_query
 
 Install via `go get` or [releases](https://github.com/miku/doajfetch/releases).
