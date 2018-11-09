@@ -151,6 +151,9 @@ Outer:
 				}
 				reader = resp.Body
 			} else {
+				if *verbose {
+					log.Printf("cache hit on %s", string(key))
+				}
 				reader = bytes.NewReader(data)
 			}
 
@@ -178,7 +181,7 @@ Outer:
 			link = payload.Next
 
 			if *showProgress {
-				log.Printf("%d/%d", *batchSize*counter, payload.Total)
+				log.Printf("[%d][%d/%d]", restartCount, *batchSize*counter, payload.Total)
 			}
 
 			counter++
