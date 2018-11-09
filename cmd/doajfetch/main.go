@@ -27,7 +27,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-const Version = "0.4.0"
+const Version = "0.4.1"
 
 var (
 	apiurl                  = flag.String("url", "https://doaj.org/api/v1/search/articles", "DOAJ API endpoint URL")
