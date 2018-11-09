@@ -4,6 +4,9 @@
 //
 // https://doaj.org/api/v1/docs#!/Search/get_api_v1_search_articles_search_query
 //
+// TODO(miku): Currently, the API might go away and we have to refetch from
+// scratch, which is impractical. As a best effort approach, one could write
+// all responses to a temp directory and let the application restart there.
 package main
 
 import (
@@ -13,6 +16,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -20,9 +24,10 @@ import (
 
 	"github.com/sethgrid/pester"
 	log "github.com/sirupsen/logrus"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
-const Version = "0.4.0"
+const Version = "0.4.1"
 
 var (
 	apiurl                  = flag.String("url", "https://doaj.org/api/v1/search/articles", "DOAJ API endpoint URL")
@@ -35,6 +40,7 @@ var (
 	maxRetries              = flag.Int("max-retries", 10, "retry failed requests")
 	maxRetriesStatusCode    = flag.Int("max-retries-status-code", 10, "retry requests with HTTP >= 400")
 	maxSleepBetweenRequests = flag.Duration("max-sleep", 10*time.Second, "maximum number of seconds to sleep between requests")
+	maxRestartCount         = flag.Int("max-restarts", 20, "maximum number of global restarts")
 )
 
 // ArticlesV1 is returned from https://doaj.org/api/v1/search/articles/*. The
@@ -63,6 +69,21 @@ func main() {
 		os.Exit(0)
 	}
 
+	// LevelDB cache for API responses.
+	cacheDir, err := ioutil.TempDir("", "doajfetch-tmp-")
+	if err != nil {
+		log.Fatal(err)
+	}
+	db, err := leveldb.OpenFile(cacheDir, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		db.Close()
+		os.RemoveAll(cacheDir)
+	}()
+
+	// Resilient client.
 	client := pester.New()
 	client.Concurrency = 3
 	client.MaxRetries = 12
@@ -74,68 +95,95 @@ func main() {
 	bw := bufio.NewWriter(os.Stdout)
 	defer bw.Flush()
 
-	var counter int64
-	var retryCountStatusCode int // number of retries based on HTTP status code
+	var counter int64            // For progress report.
+	var retryCountStatusCode int // Number of retries based on HTTP status code.
+	var restartCount int         // Global restart.
 
+Outer:
 	for {
-		req, err := http.NewRequest("GET", link, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-		req.Header.Add("User-Agent", *userAgent)
-		if *verbose {
-			log.Println(req.URL.String())
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode >= 400 {
-			if resp.StatusCode == 429 {
-				if *sleep < *maxSleepBetweenRequests {
-					*sleep = *sleep * 2
-					log.Printf("due to HTTP 429, increasing sleep between requests to %v", *sleep)
-					time.Sleep(*sleep)
-					continue
-				}
-			}
-			if retryCountStatusCode == *maxRetriesStatusCode {
-				log.Fatalf("failed with HTTP %d", resp.StatusCode)
-			}
-			time.Sleep(time.Duration(retryCountStatusCode) * time.Second)
-			log.Println("failed with HTTP %d, retry #%d", resp.StatusCode, retryCountStatusCode)
-			retryCountStatusCode++
-			continue
-		}
-
-		var buf bytes.Buffer
-		tee := io.TeeReader(resp.Body, &buf)
-
-		if _, err := io.Copy(bw, tee); err != nil {
-			log.Fatal(err)
-		}
-		if _, err := bw.Write([]byte("\n")); err != nil {
-			log.Fatal(err)
-		}
-
-		var payload ArticlesV1
-		if err := json.NewDecoder(&buf).Decode(&payload); err != nil {
-			log.Println(buf.String())
-			log.Fatal(err)
-		}
-		if payload.Next == "" {
+		if restartCount == *maxRestartCount {
 			break
 		}
-		link = payload.Next
 
-		if *showProgress {
-			log.Printf("%d/%d", *batchSize*counter, payload.Total)
-		}
-
-		counter++
+		counter = 0
 		retryCountStatusCode = 0
-		time.Sleep(*sleep)
+
+		for {
+			req, err := http.NewRequest("GET", link, nil)
+			if err != nil {
+				log.Fatal(err)
+			}
+			req.Header.Add("User-Agent", *userAgent)
+			if *verbose {
+				log.Println(req.URL.String())
+			}
+
+			// Read either from http body or bytes from cache.
+			var reader io.Reader
+			key := []byte(req.URL.String())
+
+			if data, err := db.Get(key, nil); err != nil || len(data) == 0 {
+				resp, err := client.Do(req)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer resp.Body.Close()
+
+				if resp.StatusCode >= 400 {
+					if resp.StatusCode == 429 {
+						if *sleep < *maxSleepBetweenRequests {
+							*sleep = *sleep * 2
+							log.Printf("due to HTTP 429, increasing sleep between requests to %v", *sleep)
+							time.Sleep(*sleep)
+							continue
+						}
+					}
+					if retryCountStatusCode == *maxRetriesStatusCode {
+						// Allow a global restart.
+						log.Printf("failed with HTTP %d", resp.StatusCode)
+						restartCount++
+						break
+					}
+					time.Sleep(time.Duration(retryCountStatusCode) * time.Second)
+					log.Println("failed with HTTP %d, retry #%d", resp.StatusCode, retryCountStatusCode)
+					retryCountStatusCode++
+					continue
+				}
+				reader = resp.Body
+			} else {
+				reader = bytes.NewReader(data)
+			}
+
+			// We want both, stdout and JSON parsing.
+			var buf bytes.Buffer
+			tee := io.TeeReader(reader, &buf)
+
+			if _, err := io.Copy(bw, tee); err != nil {
+				log.Fatal(err)
+			}
+			if _, err := io.WriteString(bw, "\n"); err != nil {
+				log.Fatal(err)
+			}
+			if err := db.Put(key, buf.Bytes(), nil); err != nil {
+				log.Println(err)
+			}
+
+			var payload ArticlesV1
+			if err := json.NewDecoder(&buf).Decode(&payload); err != nil {
+				log.Fatalf("%s\n%s", buf.String(), err)
+			}
+			if payload.Next == "" {
+				break Outer
+			}
+			link = payload.Next
+
+			if *showProgress {
+				log.Printf("%d/%d", *batchSize*counter, payload.Total)
+			}
+
+			counter++
+			retryCountStatusCode = 0
+			time.Sleep(*sleep)
+		}
 	}
 }
