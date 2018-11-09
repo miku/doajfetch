@@ -41,6 +41,7 @@ var (
 	maxRetriesStatusCode    = flag.Int("max-retries-status-code", 10, "retry requests with HTTP >= 400")
 	maxSleepBetweenRequests = flag.Duration("max-sleep", 10*time.Second, "maximum number of seconds to sleep between requests")
 	maxRestartCount         = flag.Int("max-restarts", 20, "maximum number of global restarts")
+	outputFile              = flag.String("o", "", "output file, necessary global restarts are used")
 )
 
 // ArticlesV1 is returned from https://doaj.org/api/v1/search/articles/*. The
@@ -99,6 +100,16 @@ func main() {
 	var retryCountStatusCode int // Number of retries based on HTTP status code.
 	var restartCount int         // Global restart.
 
+	// Copy everything into a tempfile as well.
+	tempFile, err := ioutil.TempFile("", "doajfetch-tmp-")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.Remove(tempFile.Name())
+	if *verbose {
+		log.Printf("tempfile at %s", tempFile.Name())
+	}
+
 Outer:
 	for {
 		if restartCount == *maxRestartCount {
@@ -107,6 +118,10 @@ Outer:
 
 		counter = 0
 		retryCountStatusCode = 0
+
+		if err := tempFile.Truncate(0); err != nil {
+			log.Fatal(err)
+		}
 
 		for {
 			req, err := http.NewRequest("GET", link, nil)
@@ -167,6 +182,12 @@ Outer:
 			if _, err := io.WriteString(bw, "\n"); err != nil {
 				log.Fatal(err)
 			}
+			if _, err := tempFile.Write(buf.Bytes()); err != nil {
+				log.Fatal(err)
+			}
+			if _, err := io.WriteString(tempFile, "\n"); err != nil {
+				log.Fatal(err)
+			}
 			if err := db.Put(key, buf.Bytes(), nil); err != nil {
 				log.Println(err)
 			}
@@ -188,5 +209,12 @@ Outer:
 			retryCountStatusCode = 0
 			time.Sleep(*sleep)
 		}
+	}
+
+	if err := tempFile.Close(); err != nil {
+		log.Fatal(err)
+	}
+	if *outputFile != "" {
+		os.Rename(tempFile.Name(), *outputFile)
 	}
 }
