@@ -160,7 +160,7 @@ Outer:
 						break
 					}
 					time.Sleep(time.Duration(retryCountStatusCode) * time.Second)
-					log.Println("failed with HTTP %d, retry #%d", resp.StatusCode, retryCountStatusCode)
+					log.Printf("failed with HTTP %d, retry #%d", resp.StatusCode, retryCountStatusCode)
 					retryCountStatusCode++
 					continue
 				}
