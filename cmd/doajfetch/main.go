@@ -1,12 +1,12 @@
+// UPDATE MAR 2019: This is defunkt now, try harvesting
+// http://www.doaj.org/oai.article instead.
+//
 // Fetch documents from DOAJ. Data resides in an elasticsearch server, API v1:
 //
 //     $ curl -X GET --header "Accept: application/json" "https://doaj.org/api/v1/search/articles/*"
 //
 // https://doaj.org/api/v1/docs#!/Search/get_api_v1_search_articles_search_query
 //
-// TODO(miku): Currently, the API might go away and we have to refetch from
-// scratch, which is impractical. As a best effort approach, one could write
-// all responses to a temp directory and let the application restart there.
 package main
 
 import (
