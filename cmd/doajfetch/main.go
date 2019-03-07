@@ -41,7 +41,7 @@ var (
 	maxRetriesStatusCode    = flag.Int("max-retries-status-code", 10, "retry requests with HTTP >= 400")
 	maxSleepBetweenRequests = flag.Duration("max-sleep", 10*time.Second, "maximum number of seconds to sleep between requests")
 	maxRestartCount         = flag.Int("max-restarts", 20, "maximum number of global restarts")
-	outputFile              = flag.String("o", "", "output file, necessary global restarts are used")
+	outputFile              = flag.String("o", "", "output file, necessary if global restarts are used")
 )
 
 // ArticlesV1 is returned from https://doaj.org/api/v1/search/articles/*. The
